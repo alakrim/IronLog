@@ -3,6 +3,7 @@ import { workoutVolume } from '../../domain/analytics';
 import { achievableLoads, EPS, fmtLoad, fromDisplay, platesPerSide, toDisplay } from '../../domain/loads';
 import { bestsFor, setPRs, type Bests } from '../../domain/prs';
 import type { Exercise, SetLog, Workout, WorkoutEntry } from '../../domain/types';
+import { exName, t, tn } from '../../i18n';
 import { historyFor } from '../../store/store';
 import { useActions, useApp, useUnit, useW } from '../ctx';
 import { useNav } from '../nav';
@@ -31,7 +32,7 @@ export function WorkoutScreen({ id }: { id: string }) {
   );
 
   if (!workout) {
-    return <div className="screen"><div className="empty"><h3>Workout not found</h3><button className="btn" onClick={nav.back}>Go back</button></div></div>;
+    return <div className="screen"><div className="empty"><h3>{t('Workout not found')}</h3><button className="btn" onClick={nav.back}>{t('Go back')}</button></div></div>;
   }
   if (workout.status === 'completed') {
     // Finished elsewhere (e.g. another tab) — show the summary.
@@ -46,35 +47,35 @@ export function WorkoutScreen({ id }: { id: string }) {
   return (
     <div className="screen" style={{ paddingBottom: s.timer ? 170 : 110 }}>
       <div className="wk-head">
-        <button className="icon-btn" aria-label="Back to home (workout keeps running)" onClick={nav.back}><IconBack /></button>
+        <button className="icon-btn" aria-label={t('Back to home (workout keeps running)')} onClick={nav.back}><IconBack /></button>
         <div className="title">
-          <b className="trunc">{workout.name}{workout.isHeavy ? ', heavy day' : ''}{workout.isDeload ? ', deload' : ''}</b>
+          <b className="trunc">{workout.name}{workout.isHeavy ? `, ${t('heavy day')}` : ''}{workout.isDeload ? `, ${t('deload')}` : ''}</b>
           <span className="clock num" style={{ fontWeight: 600 }}>{fmtClock(Date.now() - workout.startedAt)}</span>
           {workout.blockName && <span className="clock">  {workout.blockName}</span>}
         </div>
-        <button className="icon-btn" aria-label="Workout options" onClick={() => setMenu(true)}><IconMore /></button>
-        <button className="btn primary small" onClick={() => setFinishing(true)}>Finish</button>
+        <button className="icon-btn" aria-label={t('Workout options')} onClick={() => setMenu(true)}><IconMore /></button>
+        <button className="btn primary small" onClick={() => setFinishing(true)}>{t('Finish')}</button>
       </div>
       <div className="wk-progress" aria-hidden="true"><div style={{ width: `${total ? (done / total) * 100 : 0}%` }} /></div>
 
       {workout.entries.length === 0 && (
-        <div className="empty"><h3>Empty workout</h3><p>Add your first exercise to start logging.</p></div>
+        <div className="empty"><h3>{t('Empty workout')}</h3><p>{t('Add your first exercise to start logging.')}</p></div>
       )}
       {workout.entries.map((e, i) => (
         <EntryCard key={e.id} workout={workout} entry={e} index={i} currentSetId={current?.setId ?? null} completed={completed} live />
       ))}
 
-      <button className="btn block" style={{ marginTop: 4 }} onClick={() => setPicker(true)}><IconPlus width={20} /> Add exercise</button>
+      <button className="btn block" style={{ marginTop: 4 }} onClick={() => setPicker(true)}><IconPlus width={20} /> {t('Add exercise')}</button>
       <ExercisePicker open={picker} onClose={() => setPicker(false)} onPick={(ex) => s.addExercise(id, ex.id)} />
 
-      <Sheet open={menu} onClose={() => setMenu(false)} title="Workout options">
-        <label className="field" style={{ marginBottom: 12 }}><span>Workout name</span>
+      <Sheet open={menu} onClose={() => setMenu(false)} title={t('Workout options')}>
+        <label className="field" style={{ marginBottom: 12 }}><span>{t('Workout name')}</span>
           <input className="input" value={workout.name} onChange={(e) => s.updateWorkout(id, { name: e.target.value })} />
         </label>
-        <button className="btn danger block" onClick={() => { setMenu(false); setDiscard(true); }}>Discard workout</button>
+        <button className="btn danger block" onClick={() => { setMenu(false); setDiscard(true); }}>{t('Discard workout')}</button>
       </Sheet>
-      <Confirm open={discard} onClose={() => setDiscard(false)} danger title="Discard this workout?"
-        body="All sets logged in this workout will be deleted. This can't be undone." confirmLabel="Discard workout"
+      <Confirm open={discard} onClose={() => setDiscard(false)} danger title={t('Discard this workout?')}
+        body={t("All sets logged in this workout will be deleted. This can't be undone.")} confirmLabel={t('Discard workout')}
         onConfirm={async () => { await s.discardWorkout(id); nav.back(); }} />
       <FinishSheet open={finishing} onClose={() => setFinishing(false)} workout={workout} />
     </div>
@@ -112,10 +113,11 @@ export const EntryCard = memo(function EntryCard({ workout, entry, index, curren
   }, [prior, entry.exerciseId, workout.id]);
 
   if (!ex) return null;
-  const t = entry.target;
+  const tg = entry.target;
   const allDone = entry.sets.length > 0 && entry.sets.every((x) => x.done);
   const lastDoneId = [...entry.sets].reverse().find((x) => x.done)?.id;
-  const swapped = entry.substitutedFrom ? s.exercises.find((x) => x.id === entry.substitutedFrom)?.name : null;
+  const swappedEx = entry.substitutedFrom ? s.exercises.find((x) => x.id === entry.substitutedFrom) : undefined;
+  const swapped = swappedEx ? exName(swappedEx) : null;
   const prevByKind = (set: SetLog, i: number) => {
     const sameKind = previous.filter((p) => p.kind === set.kind || (set.kind === 'working' && p.kind !== 'warmup'));
     const kindIndex = entry.sets.slice(0, i).filter((x) => x.kind === set.kind).length;
@@ -123,30 +125,30 @@ export const EntryCard = memo(function EntryCard({ workout, entry, index, curren
   };
 
   return (
-    <section className={`ex-card${allDone ? ' done-all' : ''}${entry.skipped ? ' skipped' : ''}`} aria-label={ex.name}>
+    <section className={`ex-card${allDone ? ' done-all' : ''}${entry.skipped ? ' skipped' : ''}`} aria-label={exName(ex)}>
       <div className="ex-top">
         <div className="grow">
-          <h3>{ex.name}</h3>
+          <h3>{exName(ex)}</h3>
           <div className="meta">
-            {entry.skipped ? 'Skipped' : `${t.sets} × ${t.repMin === t.repMax ? t.repMin : `${t.repMin}–${t.repMax}`} reps${t.targetRir != null ? `, RIR ${t.targetRir}` : ''}`}
-            {swapped ? `, replaces ${swapped}` : ''}
+            {entry.skipped ? t('Skipped') : `${tg.sets} × ${tg.repMin === tg.repMax ? tg.repMin : `${tg.repMin}–${tg.repMax}`} ${t('reps')}${tg.targetRir != null ? `, RIR ${tg.targetRir}` : ''}`}
+            {swapped ? `, ${t('replaces {name}', { name: swapped })}` : ''}
           </div>
         </div>
-        <button className="icon-btn" aria-label={`Options for ${ex.name}`} onClick={() => setMenu(true)}><IconMore /></button>
+        <button className="icon-btn" aria-label={t('Options for {name}', { name: exName(ex) })} onClick={() => setMenu(true)}><IconMore /></button>
       </div>
 
       {live && entry.rec && !entry.skipped && (
-        <button className="rec" onClick={() => setWhy(true)} aria-label="Why this recommendation">
+        <button className="rec" onClick={() => setWhy(true)} aria-label={t('Why this recommendation')}>
           <span className={`badge ${entry.rec.action}`}>{ACTION_LABEL[entry.rec.action] ?? entry.rec.action}{entry.rec.weightKg != null ? ` ${w(entry.rec.weightKg)}` : ''}</span>
-          <span className="grow" style={{ lineHeight: 1.3 }}>{entry.rec.reasons[0]} <span style={{ color: 'var(--plate-blue)', fontWeight: 600 }}>Why?</span></span>
+          <span className="grow" style={{ lineHeight: 1.3 }}>{entry.rec.reasons[0]} <span style={{ color: 'var(--plate-blue)', fontWeight: 600 }}>{t('Why?')}</span></span>
         </button>
       )}
-      {entry.notes && <div className="small ink2" style={{ margin: '0 16px 8px' }}>Note: {entry.notes}</div>}
+      {entry.notes && <div className="small ink2" style={{ margin: '0 16px 8px' }}>{t('Note: {text}', { text: entry.notes })}</div>}
 
       {!entry.skipped && (
         <>
           <div className="set-head" aria-hidden="true">
-            <span style={{ textAlign: 'center' }}>Set</span><span>{s.profile.unit}</span><span>Reps</span><span />
+            <span style={{ textAlign: 'center' }}>{t('Set')}</span><span>{s.profile.unit}</span><span>{t('Reps')}</span><span />
           </div>
           {entry.sets.map((set, i) => (
             <SetRow key={set.id} workout={workout} entry={entry} ex={ex} set={set} index={i}
@@ -155,31 +157,31 @@ export const EntryCard = memo(function EntryCard({ workout, entry, index, curren
               prev={prevByKind(set, i)} bests={bests} live={live} />
           ))}
           <div className="ex-foot">
-            <button className="btn small" onClick={() => s.addSet(workout.id, entry.id)}><IconPlus width={18} /> Add set</button>
+            <button className="btn small" onClick={() => s.addSet(workout.id, entry.id)}><IconPlus width={18} /> {t('Add set')}</button>
             <div className="grow" />
             {entry.sets.length > 0 && !entry.sets[entry.sets.length - 1].done && (
-              <button className="btn small ghost" onClick={() => s.removeSet(workout.id, entry.id, entry.sets[entry.sets.length - 1].id)}>Remove last set</button>
+              <button className="btn small ghost" onClick={() => s.removeSet(workout.id, entry.id, entry.sets[entry.sets.length - 1].id)}>{t('Remove last set')}</button>
             )}
           </div>
         </>
       )}
 
-      <Sheet open={menu} onClose={() => setMenu(false)} title={ex.name}>
+      <Sheet open={menu} onClose={() => setMenu(false)} title={exName(ex)}>
         <div className="list">
-          <button className="list-item" onClick={() => { setMenu(false); nav.push({ name: 'exercise', id: ex.id }); }}><IconInfo width={20} /> Form tips and progress</button>
-          <button className="list-item" onClick={() => { setMenu(false); setSwap(true); }}><IconSwap width={20} /> Substitute exercise</button>
-          <button className="list-item" onClick={() => { setMenu(false); setNotes(true); }}><IconPlus width={20} /> {entry.notes ? 'Edit note' : 'Add note'}</button>
-          {index > 0 && <button className="list-item" onClick={() => { s.moveEntry(workout.id, entry.id, -1); setMenu(false); }}><IconUp width={20} /> Move up</button>}
-          {index < workout.entries.length - 1 && <button className="list-item" onClick={() => { s.moveEntry(workout.id, entry.id, 1); setMenu(false); }}><IconDown width={20} /> Move down</button>}
-          <button className="list-item" onClick={() => { s.setEntrySkipped(workout.id, entry.id, !entry.skipped); setMenu(false); }}><IconX width={20} /> {entry.skipped ? 'Unskip' : 'Skip today'}</button>
-          <button className="list-item" style={{ color: 'var(--plate-red)' }} onClick={() => { s.removeEntry(workout.id, entry.id); setMenu(false); }}><IconX width={20} /> Remove from workout</button>
+          <button className="list-item" onClick={() => { setMenu(false); nav.push({ name: 'exercise', id: ex.id }); }}><IconInfo width={20} /> {t('Form tips and progress')}</button>
+          <button className="list-item" onClick={() => { setMenu(false); setSwap(true); }}><IconSwap width={20} /> {t('Substitute exercise')}</button>
+          <button className="list-item" onClick={() => { setMenu(false); setNotes(true); }}><IconPlus width={20} /> {entry.notes ? t('Edit note') : t('Add note')}</button>
+          {index > 0 && <button className="list-item" onClick={() => { s.moveEntry(workout.id, entry.id, -1); setMenu(false); }}><IconUp width={20} /> {t('Move up')}</button>}
+          {index < workout.entries.length - 1 && <button className="list-item" onClick={() => { s.moveEntry(workout.id, entry.id, 1); setMenu(false); }}><IconDown width={20} /> {t('Move down')}</button>}
+          <button className="list-item" onClick={() => { s.setEntrySkipped(workout.id, entry.id, !entry.skipped); setMenu(false); }}><IconX width={20} /> {entry.skipped ? t('Unskip') : t('Skip today')}</button>
+          <button className="list-item" style={{ color: 'var(--plate-red)' }} onClick={() => { s.removeEntry(workout.id, entry.id); setMenu(false); }}><IconX width={20} /> {t('Remove from workout')}</button>
         </div>
       </Sheet>
-      <Sheet open={why} onClose={() => setWhy(false)} title="Why this suggestion">
+      <Sheet open={why} onClose={() => setWhy(false)} title={t('Why this suggestion')}>
         <ul style={{ paddingLeft: 18, margin: '0 0 12px' }}>{entry.rec?.reasons.map((r, i) => <li key={i} style={{ marginBottom: 6 }}>{r}</li>)}</ul>
-        <p className="small muted">Suggestions come from fixed rules using your logged sets. Change any weight or rep before you tick the set; the app never locks you in. Rule settings live in Settings.</p>
+        <p className="small muted">{t('Suggestions come from fixed rules using your logged sets. Change any weight or rep before you tick the set; the app never locks you in. Rule settings live in Settings.')}</p>
       </Sheet>
-      <ExercisePicker open={swap} onClose={() => setSwap(false)} title={`Replace ${ex.name}`}
+      <ExercisePicker open={swap} onClose={() => setSwap(false)} title={t('Replace {name}', { name: exName(ex) })}
         filter={(e) => e.id !== ex.id}
         onPick={(n) => s.substituteExercise(workout.id, entry.id, n.id)} />
       <NotesSheet open={notes} onClose={() => setNotes(false)} value={entry.notes} onSave={(v) => s.setEntryNotes(workout.id, entry.id, v)} />
@@ -191,9 +193,9 @@ function NotesSheet({ open, onClose, value, onSave }: { open: boolean; onClose: 
   const [v, setV] = useState(value);
   useEffect(() => { if (open) setV(value); }, [open, value]);
   return (
-    <Sheet open={open} onClose={onClose} title="Exercise note">
-      <textarea className="input" value={v} onChange={(e) => setV(e.target.value)} placeholder="Seat height 4, felt a twinge in the left shoulder…" autoFocus />
-      <button className="btn primary block" style={{ marginTop: 12 }} onClick={() => { onSave(v.trim()); onClose(); }}>Save note</button>
+    <Sheet open={open} onClose={onClose} title={t('Exercise note')}>
+      <textarea className="input" value={v} onChange={(e) => setV(e.target.value)} placeholder={t('Seat height 4, felt a twinge in the left shoulder…')} autoFocus />
+      <button className="btn primary block" style={{ marginTop: 12 }} onClick={() => { onSave(v.trim()); onClose(); }}>{t('Save note')}</button>
     </Sheet>
   );
 }
@@ -229,7 +231,7 @@ function SetRow({ workout, entry, ex, set, index, number, current, showRir, prev
     s.updateSet(workout.id, entry.id, set.id, { weightKg: below.length ? below[below.length - 1] : 0 });
   };
   const bw = ex.equipment === 'bodyweight';
-  const weightText = set.weightKg === 0 && (bw || set.done) ? (bw ? 'BW' : '0') : set.weightKg === 0 ? '' : fmtLoad(set.weightKg, unit);
+  const weightText = set.weightKg === 0 && (bw || set.done) ? (bw ? t('BW') : '0') : set.weightKg === 0 ? '' : fmtLoad(set.weightKg, unit);
 
   const toggle = async () => {
     const nowDone = await s.toggleSet(workout.id, entry.id, set.id);
@@ -246,30 +248,30 @@ function SetRow({ workout, entry, ex, set, index, number, current, showRir, prev
     <div ref={rowRef} className={`set-row${current ? ' current' : ''}${set.done ? ' done' : ''}`}>
       <div className="set-no">
         {set.kind === 'warmup' ? 'W' : number}
-        {(set.kind === 'top' || set.kind === 'backoff') && <small>{set.kind === 'top' ? 'top' : 'back-off'}</small>}
+        {(set.kind === 'top' || set.kind === 'backoff') && <small>{set.kind === 'top' ? t('top') : t('back-off')}</small>}
       </div>
-      <StepperCell label={`Set ${number} weight`} display={weightText} placeholder={unit} decimal
+      <StepperCell label={t('Set {n} weight', { n: number })} display={weightText} placeholder={unit} decimal
         onCommit={(n) => s.updateSet(workout.id, entry.id, set.id, { weightKg: Math.round(fromDisplay(n, unit) * 1e4) / 1e4 })}
         onDec={down} onInc={up} />
-      <StepperCell label={`Set ${number} reps`} display={String(set.reps)}
+      <StepperCell label={t('Set {n} reps', { n: number })} display={String(set.reps)}
         onCommit={(n) => s.updateSet(workout.id, entry.id, set.id, { reps: Math.round(n) })}
         onDec={() => s.updateSet(workout.id, entry.id, set.id, { reps: Math.max(0, set.reps - 1) })}
         onInc={() => s.updateSet(workout.id, entry.id, set.id, { reps: set.reps + 1 })} />
-      <button className={`check${set.done ? ' on' : ''}`} aria-pressed={set.done} aria-label={set.done ? `Set ${number} done. Tap to undo` : `Complete set ${number}`} onClick={toggle}>
+      <button className={`check${set.done ? ' on' : ''}`} aria-pressed={set.done} aria-label={set.done ? t('Set {n} done. Tap to undo', { n: number }) : t('Complete set {n}', { n: number })} onClick={toggle}>
         <IconCheck />
       </button>
       {!set.done && (prev || (plates && plates.length > 0)) && (
         <div className="prev">
-          {prev && <>Last time <span className="num">{fmtLoad(prev.weightKg, unit)} × {prev.reps}</span>{prev.rir != null ? `, RIR ${prev.rir}` : ''}</>}
-          {plates && plates.length > 0 && <div>Per side: {plates.map((p) => fmtLoad(p, unit)).join(' + ')}</div>}
+          {prev && <>{t('Last time')} <span className="num">{fmtLoad(prev.weightKg, unit)} × {prev.reps}</span>{prev.rir != null ? `, RIR ${prev.rir}` : ''}</>}
+          {plates && plates.length > 0 && <div>{t('Per side:')} {plates.map((p) => fmtLoad(p, unit)).join(' + ')}</div>}
         </div>
       )}
       {prs.length > 0 && (
-        <div className="pr-flag"><span className="badge pr">New PR</span> <span className="small ink2">{prs.map((p) => PR_TEXT[p.type]).join(', ')}</span></div>
+        <div className="pr-flag"><span className="badge pr">{t('New PR')}</span> <span className="small ink2">{prs.map((p) => PR_TEXT[p.type]).join(', ')}</span></div>
       )}
       {showRir && settings.askRir && (
-        <div className="rir-row" role="group" aria-label="Reps in reserve (optional)">
-          <span>Reps left?</span>
+        <div className="rir-row" role="group" aria-label={t('Reps in reserve (optional)')}>
+          <span>{t('Reps left?')}</span>
           {[0, 1, 2, 3, 4].map((r) => (
             <button key={r} aria-pressed={set.rir === r} onClick={() => s.updateSet(workout.id, entry.id, set.id, { rir: set.rir === r ? null : r })}>{r === 4 ? '4+' : r}</button>
           ))}
@@ -290,13 +292,13 @@ function StepperCell(p: { label: string; display: string; placeholder?: string; 
   };
   return (
     <div className="stepper">
-      <button type="button" aria-label={`Decrease ${p.label}`} onClick={p.onDec}>−</button>
+      <button type="button" aria-label={t('Decrease {label}', { label: p.label })} onClick={p.onDec}>−</button>
       <input className="val" aria-label={p.label} inputMode={p.decimal ? 'decimal' : 'numeric'} enterKeyHint="done"
         value={draft ?? p.display} placeholder={draft != null ? p.display || p.placeholder : p.placeholder}
         onFocus={() => setDraft('')}
         onChange={(e) => setDraft(e.target.value)} onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
-      <button type="button" aria-label={`Increase ${p.label}`} onClick={p.onInc}>+</button>
+      <button type="button" aria-label={t('Increase {label}', { label: p.label })} onClick={p.onInc}>+</button>
     </div>
   );
 }
@@ -311,17 +313,17 @@ function FinishSheet({ open, onClose, workout }: { open: boolean; onClose: () =>
   const done = doneSets(workout);
   const open_ = workout.entries.filter((e) => !e.skipped).reduce((a, e) => a + e.sets.filter((x) => !x.done).length, 0);
   return (
-    <Sheet open={open} onClose={onClose} title={done ? 'Finish workout?' : 'Nothing logged yet'}>
+    <Sheet open={open} onClose={onClose} title={done ? t('Finish workout?') : t('Nothing logged yet')}>
       {done ? (
         <>
           <div className="stat-row" style={{ marginBottom: 12 }}>
-            <div className="stat"><div className="num">{fmtDuration(Date.now() - workout.startedAt)}</div><div className="muted">duration</div></div>
-            <div className="stat"><div className="num">{done}</div><div className="muted">sets</div></div>
-            <div className="stat"><div className="num">{fmtBig(toDisplay(workoutVolume(workout), s.profile.unit))}</div><div className="muted">{s.profile.unit} lifted</div></div>
+            <div className="stat"><div className="num">{fmtDuration(Date.now() - workout.startedAt)}</div><div className="muted">{t('duration')}</div></div>
+            <div className="stat"><div className="num">{done}</div><div className="muted">{t('sets')}</div></div>
+            <div className="stat"><div className="num">{fmtBig(toDisplay(workoutVolume(workout), s.profile.unit))}</div><div className="muted">{t('{unit} lifted', { unit: s.profile.unit })}</div></div>
           </div>
-          {open_ > 0 && <div className="note yellow" style={{ marginBottom: 12 }}>{open_} unticked set{open_ > 1 ? 's' : ''} won't count toward progress.</div>}
-          <label className="field"><span>Workout note (optional)</span>
-            <textarea className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Slept badly, gym was busy…" />
+          {open_ > 0 && <div className="note yellow" style={{ marginBottom: 12 }}>{tn(open_, "{n} unticked set won't count toward progress.", "{n} unticked sets won't count toward progress.")}</div>}
+          <label className="field"><span>{t('Workout note (optional)')}</span>
+            <textarea className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Slept badly, gym was busy…')} />
           </label>
           <div className="stack" style={{ marginTop: 16 }}>
             <button className="btn primary block" onClick={async () => {
@@ -329,16 +331,16 @@ function FinishSheet({ open, onClose, workout }: { open: boolean; onClose: () =>
               await s.finishWorkout(workout.id);
               onClose();
               nav.replace({ name: 'workoutDetail', id: workout.id, finished: true });
-            }}>Finish workout</button>
-            <button className="btn ghost block" onClick={onClose}>Keep going</button>
+            }}>{t('Finish workout')}</button>
+            <button className="btn ghost block" onClick={onClose}>{t('Keep going')}</button>
           </div>
         </>
       ) : (
         <>
-          <p className="ink2">Tick at least one set to save this workout, or discard it.</p>
+          <p className="ink2">{t('Tick at least one set to save this workout, or discard it.')}</p>
           <div className="stack">
-            <button className="btn block" onClick={onClose}>Keep going</button>
-            <button className="btn danger block" onClick={async () => { await s.discardWorkout(workout.id); onClose(); nav.back(); }}>Discard workout</button>
+            <button className="btn block" onClick={onClose}>{t('Keep going')}</button>
+            <button className="btn danger block" onClick={async () => { await s.discardWorkout(workout.id); onClose(); nav.back(); }}>{t('Discard workout')}</button>
           </div>
         </>
       )}
@@ -376,10 +378,10 @@ export function TimerBar() {
       <div className="track" style={{ width: `${pct * 100}%` }} />
       <div className="inner">
         <span className="num">{over ? fmtClock(-left) : fmtClock(left + 999)}</span>
-        <span className="lbl">{over ? 'Rest done, next set' : 'Rest'}</span>
-        {!over && <button onClick={() => adjustTimer(-15)} aria-label="Remove 15 seconds">−15</button>}
-        {!over && <button onClick={() => adjustTimer(15)} aria-label="Add 15 seconds">+15</button>}
-        <button onClick={stopTimer}>{over ? 'Close' : 'Skip'}</button>
+        <span className="lbl">{over ? t('Rest done, next set') : t('Rest')}</span>
+        {!over && <button onClick={() => adjustTimer(-15)} aria-label={t('Remove 15 seconds')}>−15</button>}
+        {!over && <button onClick={() => adjustTimer(15)} aria-label={t('Add 15 seconds')}>+15</button>}
+        <button onClick={stopTimer}>{over ? t('Close') : t('Skip')}</button>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 /** Minimal SVG charts sized for phones: few gridlines, large marks, labelled ends. */
+import { t } from '../i18n';
 import { fmtDate } from './fmt';
 
 const W = 340, H = 170, L = 36, R = 10, T = 10, B = 24;
@@ -20,7 +21,7 @@ export interface Pt { x: number; y: number; pr?: boolean }
 export function LineChart({ points, alt, yFmt = (v) => String(v), label }: {
   points: Pt[]; alt?: Pt[]; yFmt?: (v: number) => string; label: string;
 }) {
-  if (points.length === 0) return <div className="muted small" style={{ padding: '24px 0', textAlign: 'center' }}>Log this exercise to see a trend.</div>;
+  if (points.length === 0) return <div className="muted small" style={{ padding: '24px 0', textAlign: 'center' }}>{t('Log this exercise to see a trend.')}</div>;
   const all = [...points, ...(alt ?? [])];
   const ys = all.map((p) => p.y);
   const ticks = niceTicks(Math.min(...ys) * 0.97, Math.max(...ys) * 1.02);

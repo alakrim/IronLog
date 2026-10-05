@@ -82,6 +82,8 @@ export interface Profile extends Timestamps {
   experience: Experience;
   unit: Unit;
   onboarded: boolean;
+  /** UI language. Missing = follow the device. */
+  language?: 'en' | 'pt';
   settings: Settings;
 }
 

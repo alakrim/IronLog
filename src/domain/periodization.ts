@@ -2,6 +2,7 @@
  * Training blocks, deload signals and heavy-day scheduling. Pure and deterministic:
  * every function takes `now` explicitly.
  */
+import { t } from '../i18n';
 import { e1rm } from './e1rm';
 import type { Block, Program, Settings, Workout } from './types';
 
@@ -17,11 +18,11 @@ export function block(partial: Omit<Block, 'id'>): Block {
 /** Default 15-week cycle from the specification: hypertrophy → strength → deload. */
 export function defaultBlocks(): Block[] {
   return [
-    block({ name: 'Hypertrophy I', type: 'hypertrophy', weeks: 4, repMin: 8, repMax: 12, sets: 3, targetRir: 2, method: 'double', setFactor: 1, loadFactor: 1 }),
-    block({ name: 'Hypertrophy II', type: 'hypertrophy', weeks: 4, repMin: 6, repMax: 10, sets: 3, targetRir: 2, method: 'double', setFactor: 1, loadFactor: 1 }),
-    block({ name: 'Strength I', type: 'strength', weeks: 3, repMin: 3, repMax: 6, sets: 4, targetRir: 2, method: 'double', setFactor: 1, loadFactor: 1 }),
-    block({ name: 'Strength II', type: 'strength', weeks: 3, repMin: 3, repMax: 5, sets: 4, targetRir: 1, method: 'double', setFactor: 1, loadFactor: 1 }),
-    block({ name: 'Deload', type: 'deload', weeks: 1, repMin: 8, repMax: 12, sets: 0, targetRir: 4, method: 'none', setFactor: 0.5, loadFactor: 0.9 }),
+    block({ name: t('Hypertrophy I'), type: 'hypertrophy', weeks: 4, repMin: 8, repMax: 12, sets: 3, targetRir: 2, method: 'double', setFactor: 1, loadFactor: 1 }),
+    block({ name: t('Hypertrophy II'), type: 'hypertrophy', weeks: 4, repMin: 6, repMax: 10, sets: 3, targetRir: 2, method: 'double', setFactor: 1, loadFactor: 1 }),
+    block({ name: t('Strength I'), type: 'strength', weeks: 3, repMin: 3, repMax: 6, sets: 4, targetRir: 2, method: 'double', setFactor: 1, loadFactor: 1 }),
+    block({ name: t('Strength II'), type: 'strength', weeks: 3, repMin: 3, repMax: 5, sets: 4, targetRir: 1, method: 'double', setFactor: 1, loadFactor: 1 }),
+    block({ name: t('Deload'), type: 'deload', weeks: 1, repMin: 8, repMax: 12, sets: 0, targetRir: 4, method: 'none', setFactor: 0.5, loadFactor: 0.9 }),
   ];
 }
 
@@ -94,7 +95,7 @@ export function deloadAdvice(
   if (!programActive && settings.deloadEveryWeeks > 0) {
     const since = lastDeload ? lastDeload.startedAt : ws[ws.length - 1].startedAt;
     const weeks = Math.floor((now - since) / WEEK_MS);
-    if (weeks >= settings.deloadEveryWeeks) reasons.push(`${weeks} weeks since your last deload (planned every ${settings.deloadEveryWeeks}).`);
+    if (weeks >= settings.deloadEveryWeeks) reasons.push(t('{weeks} weeks since your last deload (planned every {every}).', { weeks, every: settings.deloadEveryWeeks }));
   }
 
   const exIds = [...new Set(ws.flatMap((w) => w.entries.map((e) => e.exerciseId)))];
@@ -105,7 +106,7 @@ export function deloadAdvice(
     return true;
   });
   if (declining.length >= DECLINE_EXERCISES) {
-    reasons.push(`Estimated 1RM has dropped ${DECLINE_SESSIONS} sessions in a row on ${declining.length} exercises.`);
+    reasons.push(t('Estimated 1RM has dropped {sessions} sessions in a row on {n} exercises.', { sessions: DECLINE_SESSIONS, n: declining.length }));
   }
 
   let streak = 0;
@@ -115,7 +116,7 @@ export function deloadAdvice(
     if (rirs.length > 0 && rirs.every((r) => r === 0)) streak++;
     else break;
   }
-  if (streak >= HARD_SESSION_STREAK) reasons.push(`${streak} sessions in a row taken to failure on every recorded set.`);
+  if (streak >= HARD_SESSION_STREAK) reasons.push(t('{n} sessions in a row taken to failure on every recorded set.', { n: streak }));
 
   return { recommend: reasons.length > 0, reasons };
 }

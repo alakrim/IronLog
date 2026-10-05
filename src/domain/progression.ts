@@ -2,6 +2,7 @@
  * Deterministic progression engine. See docs/RULES.md for the plain-language rules.
  * Pure functions: same inputs → same recommendation, with human-readable reasons.
  */
+import { exName, t, tn } from '../i18n';
 import { e1rm, loadForReps } from './e1rm';
 import { achievableLoads, EPS, loadAtOrBelow, nextLoadUp } from './loads';
 import type {
@@ -118,7 +119,7 @@ function baseRecommendation(
       action: 'start', weightKg: null, target, previous: [],
       plan: planFor(target, null, null, settings.progression),
       reasons: [
-        `No history yet. Choose a load you can lift for about ${target.repMax} reps with 2–3 reps in reserve.`,
+        t('No history yet. Choose a load you can lift for about {reps} reps with 2–3 reps in reserve.', { reps: target.repMax }),
       ],
     };
   }
@@ -143,21 +144,22 @@ function baseRecommendation(
         action: 'transition', weightKg: load, target, previous: [],
         plan: planFor(target, load, null, p, loads),
         reasons: [
-          `Rep range changed from ${last.target.repMin}–${last.target.repMax} to ${target.repMin}–${target.repMax}.`,
-          `Load re-based from your estimated 1RM (${kg(best)}) for ${target.repMax} reps at RIR ${target.targetRir ?? 2}${raw > capped + EPS ? `, capped at +${TRANSITION_CAP * 100}%` : ''}.`,
+          t('Rep range changed from {a} to {b}.', { a: `${last.target.repMin}–${last.target.repMax}`, b: `${target.repMin}–${target.repMax}` }),
+          t('Load re-based from your estimated 1RM ({e1rm}) for {reps} reps at RIR {rir}.', { e1rm: kg(best), reps: target.repMax, rir: target.targetRir ?? 2 })
+            + (raw > capped + EPS ? ' ' + t('Capped at +{pct}%.', { pct: TRANSITION_CAP * 100 }) : ''),
         ],
       };
     }
   }
 
   if (target.method === 'none') {
-    return mk('maintain', w, target, p, loads, reps, ['Automatic progression is off for this exercise.']);
+    return mk('maintain', w, target, p, loads, reps, [t('Automatic progression is off for this exercise.')]);
   }
 
   // 2. Not all prescribed sets were completed → repeat.
   if (atW.length < neededSets) {
     return mk('maintain', w, target, p, loads, reps, [
-      `Last time: ${atW.length} of ${neededSets} sets completed at ${kg(w)}. Complete all sets before adding load.`,
+      t('Last time: {done} of {total} sets completed at {w}. Complete all sets before adding load.', { done: atW.length, total: neededSets, w: kg(w) }),
     ]);
   }
 
@@ -169,16 +171,16 @@ function baseRecommendation(
     const next = nextLoadUp(w, exercise.incrementKg, loads, settings.equipment.maxJumpPct);
     if (!next) {
       return mk('maintain', w, target, p, loads, reps, [
-        `Hit ${target.repMax}+ reps on all sets, but ${kg(w)} is the heaviest load available. Add reps or a set.`,
+        t('Hit {reps}+ reps on all sets, but {w} is the heaviest load available. Add reps or a set.', { reps: target.repMax, w: kg(w) }),
       ]);
     }
     const reasons = [
-      `Hit ${target.repMax}+ reps on all ${neededSets} set${neededSets > 1 ? 's' : ''} at ${kg(w)} (${lastReps}).`,
+      tn(neededSets, 'Hit {reps}+ reps on {n} set at {w} ({last}).', 'Hit {reps}+ reps on all {n} sets at {w} ({last}).', { reps: target.repMax, w: kg(w), last: lastReps }),
       rir.note,
-      `Increase to ${kg(next.load)} (+${r1(next.load - w)} kg) and aim for ${target.repMin}+ reps.`,
+      t('Increase to {next} (+{diff} kg) and aim for {reps}+ reps.', { next: kg(next.load), diff: r1(next.load - w), reps: target.repMin }),
     ];
     if (next.exceedsCap) {
-      reasons.push(`Smallest available jump is ${Math.round(((next.load - w) / w) * 100)}% — expect fewer reps at first.`);
+      reasons.push(t('Smallest available jump is {pct}% — expect fewer reps at first.', { pct: Math.round(((next.load - w) / w) * 100) }));
     }
     return {
       action: 'increase', weightKg: next.load, target, previous: [],
@@ -187,8 +189,8 @@ function baseRecommendation(
   }
   if (hitTop && !rir.ok) {
     return mk('maintain', w, target, p, loads, reps, [
-      `Reached ${target.repMax} reps on all sets, but effort was too high (${rir.note}).`,
-      'Repeat this load until it feels easier.',
+      t('Reached {reps} reps on all sets, but effort was too high ({note}).', { reps: target.repMax, note: rir.note ?? '' }),
+      t('Repeat this load until it feels easier.'),
     ]);
   }
 
@@ -203,21 +205,21 @@ function baseRecommendation(
           action: 'reduce', weightKg: load, target, previous: [],
           plan: planFor(target, load, null, p, loads),
           reasons: [
-            `Below ${target.repMin} reps at ${kg(w)} for ${fails} sessions in a row (last: ${lastReps}).`,
-            `Reduce ~${Math.round(p.reducePct * 100)}% to ${kg(load)} and build back up.`,
+            t('Below {reps} reps at {w} for {n} sessions in a row (last: {last}).', { reps: target.repMin, w: kg(w), n: fails, last: lastReps }),
+            t('Reduce ~{pct}% to {load} and build back up.', { pct: Math.round(p.reducePct * 100), load: kg(load) }),
           ],
         };
       }
     }
     return mk('maintain', w, target, p, loads, reps, [
-      `Last time ${lastReps} at ${kg(w)} — below the ${target.repMin}-rep floor.`,
-      `Repeat the load. A reduction is suggested after ${p.failuresBeforeReduce} sessions in a row below the floor.`,
+      t('Last time {last} at {w} — below the {reps}-rep floor.', { last: lastReps, w: kg(w), reps: target.repMin }),
+      t('Repeat the load. A reduction is suggested after {n} sessions in a row below the floor.', { n: p.failuresBeforeReduce }),
     ]);
   }
 
   // 5. In range but not at the top → same load, beat the reps.
   return mk('maintain', w, target, p, loads, reps, [
-    `Last time ${lastReps} at ${kg(w)}. Keep the load and add reps until every set reaches ${target.repMax}.`,
+    t('Last time {last} at {w}. Keep the load and add reps until every set reaches {reps}.', { last: lastReps, w: kg(w), reps: target.repMax }),
   ]);
 }
 
@@ -239,10 +241,10 @@ function topSetOf(work: SetLog[]): SetLog[] {
 function rirCheck(sets: SetLog[], p: ProgressionSettings): { ok: boolean; note: string | null } {
   if (p.minRirToProgress == null) return { ok: true, note: null };
   const recorded = sets.filter((s) => s.rir != null).map((s) => s.rir as number);
-  if (recorded.length === 0) return { ok: true, note: 'RIR not recorded — decided on reps alone.' };
+  if (recorded.length === 0) return { ok: true, note: t('RIR not recorded — decided on reps alone.') };
   const avg = recorded.reduce((a, b) => a + b, 0) / recorded.length;
   const ok = avg >= p.minRirToProgress - EPS;
-  return { ok, note: `average RIR ${r1(avg)} ${ok ? '≥' : '<'} required ${p.minRirToProgress}` };
+  return { ok, note: t(ok ? 'average RIR {avg} ≥ required {min}' : 'average RIR {avg} < required {min}', { avg: r1(avg), min: p.minRirToProgress }) };
 }
 
 function consecutiveFailures(sessions: HistoryEntry[], w: number, target: EntryTarget, useTop: boolean): number {
@@ -290,7 +292,7 @@ function applyHeavy(rec: Recommendation, ex: Exercise, sessions: HistoryEntry[],
     return {
       ...rec, action: 'heavy', target,
       plan: Array.from({ length: target.sets }, () => ({ kind: 'working' as SetKind, weightKg: rec.weightKg, reps: target.repMin })),
-      reasons: [`Heavy day: ${target.sets} × ${target.repMin}–${target.repMax}. Not enough recent data to estimate a load — work up conservatively.`],
+      reasons: [t('Heavy day: {sets} × {range}. Not enough recent data to estimate a load — work up conservatively.', { sets: target.sets, range: `${target.repMin}–${target.repMax}` })],
     };
   }
   const raw = loadForReps(best, target.repMax, target.targetRir);
@@ -299,8 +301,8 @@ function applyHeavy(rec: Recommendation, ex: Exercise, sessions: HistoryEntry[],
     ...rec, action: 'heavy', weightKg: load, target,
     plan: Array.from({ length: target.sets }, () => ({ kind: 'working' as SetKind, weightKg: load, reps: target.repMin })),
     reasons: [
-      `Heavy day for ${ex.name}: ${target.sets} × ${target.repMin}–${target.repMax} at RIR ${target.targetRir}.`,
-      `Load from recent estimated 1RM (${kg(best)}), rounded down to ${kg(load)}. Stop a set if form breaks.`,
+      t('Heavy day for {name}: {sets} × {range} at RIR {rir}.', { name: exName(ex), sets: target.sets, range: `${target.repMin}–${target.repMax}`, rir: target.targetRir ?? 2 }),
+      t('Load from recent estimated 1RM ({e1rm}), rounded down to {load}. Stop a set if form breaks.', { e1rm: kg(best), load: kg(load) }),
     ],
   };
 }
@@ -318,8 +320,8 @@ function applyDeload(rec: Recommendation, ctx: Context, loads: number[]): Recomm
     ...rec, action: 'deload', weightKg: load, target,
     plan: Array.from({ length: sets }, () => ({ kind: 'working' as SetKind, weightKg: load, reps: rec.target.repMin })),
     reasons: [
-      `Deload: ${sets} set${sets > 1 ? 's' : ''} instead of ${rec.target.sets}, ~${Math.round(lf * 100)}% load, stop ~4 reps short of failure.`,
-      'Progression resumes from your pre-deload numbers next session.',
+      tn(sets, 'Deload: {n} set instead of {orig}, ~{pct}% load, stop ~4 reps short of failure.', 'Deload: {n} sets instead of {orig}, ~{pct}% load, stop ~4 reps short of failure.', { orig: rec.target.sets, pct: Math.round(lf * 100) }),
+      t('Progression resumes from your pre-deload numbers next session.'),
     ],
   };
 }

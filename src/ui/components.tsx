@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Exercise, ID, Muscle } from '../domain/types';
 import { useApp } from './ctx';
-import { MUSCLE_LABEL } from './fmt';
+import { t, exName } from '../i18n';
+import { EQUIP_LABEL, MUSCLE_LABEL } from './fmt';
 import { IconSearch } from './icons';
 
 export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: string; children: ReactNode }) {
@@ -31,7 +32,7 @@ export function Confirm({ open, title, body, confirmLabel, danger, onConfirm, on
       {body && <div className="ink2" style={{ marginBottom: 16 }}>{body}</div>}
       <div className="stack">
         <button className={`btn block ${danger ? 'danger' : 'primary'}`} onClick={() => { onConfirm(); onClose(); }}>{confirmLabel}</button>
-        <button className="btn block ghost" onClick={onClose}>Cancel</button>
+        <button className="btn block ghost" onClick={onClose}>{t('Cancel')}</button>
       </div>
     </Sheet>
   );
@@ -51,7 +52,7 @@ export function Stepper({ value, display, onCommit, onDec, onInc, placeholder, d
   };
   return (
     <div className="stepper">
-      <button type="button" aria-label={`Decrease ${label}`} onClick={onDec}>−</button>
+      <button type="button" aria-label={t('Decrease {label}', { label })} onClick={onDec}>−</button>
       <input
         className="val" aria-label={label} inputMode={decimal ? 'decimal' : 'numeric'}
         value={draft ?? display} placeholder={placeholder}
@@ -60,7 +61,7 @@ export function Stepper({ value, display, onCommit, onDec, onInc, placeholder, d
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
       />
-      <button type="button" aria-label={`Increase ${label}`} onClick={onInc}>+</button>
+      <button type="button" aria-label={t('Increase {label}', { label })} onClick={onInc}>+</button>
       <span hidden>{value}</span>
     </div>
   );
@@ -109,6 +110,17 @@ const GROUPS: { label: string; muscles: Muscle[] }[] = [
 ];
 export const MUSCLE_GROUPS = GROUPS;
 
+function groupLabel(l: string): string {
+  switch (l) {
+    case 'Chest': return t('Chest');
+    case 'Back': return t('Back||muscles');
+    case 'Shoulders': return t('Shoulders');
+    case 'Legs': return t('Legs');
+    case 'Arms': return t('Arms');
+    default: return t('Core');
+  }
+}
+
 export function ExerciseList({ onPick, filter, highlight }: { onPick: (e: Exercise) => void; filter?: (e: Exercise) => boolean; highlight?: ID }) {
   const all = useApp((s) => s.exercises);
   const [q, setQ] = useState('');
@@ -116,37 +128,39 @@ export function ExerciseList({ onPick, filter, highlight }: { onPick: (e: Exerci
   const list = useMemo(() => {
     const g = GROUPS.find((x) => x.label === group);
     const qq = q.trim().toLowerCase();
-    return all.filter((e) => e.active && (!filter || filter(e)) && (!g || g.muscles.includes(e.primary)) &&
-      (!qq || e.name.toLowerCase().includes(qq) || MUSCLE_LABEL[e.primary].toLowerCase().includes(qq) || e.equipment.includes(qq)));
+    return all
+      .filter((e) => e.active && (!filter || filter(e)) && (!g || g.muscles.includes(e.primary)) &&
+        (!qq || exName(e).toLowerCase().includes(qq) || e.name.toLowerCase().includes(qq) || MUSCLE_LABEL[e.primary].toLowerCase().includes(qq) || EQUIP_LABEL[e.equipment].toLowerCase().includes(qq) || e.equipment.includes(qq)))
+      .sort((a, b) => exName(a).localeCompare(exName(b)));
   }, [all, q, group, filter]);
   const ref = useRef<HTMLInputElement>(null);
   return (
     <div>
       <div className="row" style={{ background: 'var(--deck)', borderRadius: 12, padding: '0 12px', border: '1px solid var(--line)' }}>
         <IconSearch width={20} className="muted" />
-        <input ref={ref} className="input" style={{ border: 0, padding: '10px 0', background: 'none' }} placeholder="Search exercises" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search exercises" />
+        <input ref={ref} className="input" style={{ border: 0, padding: '10px 0', background: 'none' }} placeholder={t('Search exercises')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('Search exercises')} />
       </div>
       <div className="chips" style={{ margin: '10px 0 12px' }}>
         {GROUPS.map((g) => (
-          <button key={g.label} className="chip" aria-pressed={group === g.label} onClick={() => setGroup(group === g.label ? null : g.label)}>{g.label}</button>
+          <button key={g.label} className="chip" aria-pressed={group === g.label} onClick={() => setGroup(group === g.label ? null : g.label)}>{groupLabel(g.label)}</button>
         ))}
       </div>
       <div className="list">
         {list.map((e) => (
           <button key={e.id} className="list-item" onClick={() => onPick(e)} style={e.id === highlight ? { background: 'var(--tint-yellow)' } : undefined}>
             <div className="grow">
-              <div className="trunc" style={{ fontWeight: 500 }}>{e.name}</div>
-              <div className="tiny muted">{MUSCLE_LABEL[e.primary]}, {e.equipment}{e.isCustom ? ', custom' : ''}</div>
+              <div className="trunc" style={{ fontWeight: 500 }}>{exName(e)}</div>
+              <div className="tiny muted">{MUSCLE_LABEL[e.primary]}, {EQUIP_LABEL[e.equipment].toLowerCase()}{e.isCustom ? `, ${t('custom')}` : ''}</div>
             </div>
           </button>
         ))}
-        {list.length === 0 && <div className="empty small">No exercises match. Try another word, or add a custom exercise in the Exercises tab.</div>}
+        {list.length === 0 && <div className="empty small">{t('No exercises match. Try another word, or add a custom exercise in the Exercises tab.')}</div>}
       </div>
     </div>
   );
 }
 
-export function ExercisePicker({ open, onClose, onPick, title = 'Add exercise', filter }: {
+export function ExercisePicker({ open, onClose, onPick, title = t('Add exercise'), filter }: {
   open: boolean; onClose: () => void; onPick: (e: Exercise) => void; title?: string; filter?: (e: Exercise) => boolean;
 }) {
   return (
@@ -160,7 +174,7 @@ export function TopBar({ title, sub, onBack, right }: { title: ReactNode; sub?: 
   return (
     <div className="topbar">
       {onBack && (
-        <button className="icon-btn" aria-label="Back" onClick={onBack}>
+        <button className="icon-btn" aria-label={t('Back')} onClick={onBack}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
       )}

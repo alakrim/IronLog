@@ -15,6 +15,7 @@ import type { Repo } from '../data/db';
 import { seedExercises } from '../data/seedExercises';
 import { itemFor, seedTemplates } from '../data/seedTemplates';
 import { uid } from '../data/uid';
+import { detectLang, seedName, setLang, t, type Lang } from '../i18n';
 
 export interface Timer { endsAt: number; total: number }
 
@@ -45,6 +46,7 @@ export interface Actions {
   completeOnboarding(o: { name: string; unit: Unit; experience: Experience; usePrograms: boolean }): Promise<void>;
   updateProfile(p: Partial<Pick<Profile, 'name' | 'experience'>>): Promise<void>;
   setUnit(u: Unit, resetEquipment: boolean): Promise<void>;
+  setLanguage(l: Lang): Promise<void>;
   updateSettings(fn: (s: Settings) => Settings): Promise<void>;
 
   startWorkout(o: StartOptions): Promise<ID>;
@@ -182,6 +184,8 @@ export function createAppStore(repo: Repo, clock: () => number = Date.now): AppS
         ]);
         const meta = new Map(metaRows.map((r) => [r.id, r]));
         const profile = (meta.get('profile') as unknown as Profile | undefined) ?? blankProfile(now);
+        profile.language = profile.language ?? detectLang();
+        setLang(profile.language);
         // Forward-compatible settings: fill any keys added in newer versions.
         const d = defaultSettings(profile.unit);
         profile.settings = {
@@ -230,6 +234,36 @@ export function createAppStore(repo: Repo, clock: () => number = Date.now): AppS
         await repo.put('meta', profile);
       },
 
+      async setLanguage(language) {
+        setLang(language);
+        const now = clock();
+        const profile = { ...get().profile, language, updatedAt: now };
+        // Rename the names the app created for you (Push → Empurrar, ...) so the UI stays in one language.
+        const renamed = <T extends { name: string }>(items: T[]) => {
+          const changed: T[] = [];
+          const out = items.map((x) => {
+            const name = seedName(x.name, language);
+            if (name === x.name) return x;
+            const y = { ...x, name, updatedAt: now };
+            changed.push(y);
+            return y;
+          });
+          return { out, changed };
+        };
+        const tpl = renamed(get().templates);
+        const wk = renamed(get().workouts);
+        let program = get().program;
+        if (program) {
+          const blocks = program.blocks.map((b) => ({ ...b, name: seedName(b.name, language) }));
+          program = { ...program, name: seedName(program.name, language), blocks };
+        }
+        set({ profile, templates: tpl.out, workouts: wk.out, program });
+        await repo.put('meta', profile);
+        if (program) await repo.put('meta', program);
+        if (tpl.changed.length) await repo.putMany('templates', tpl.changed);
+        if (wk.changed.length) await repo.putMany('workouts', wk.changed);
+      },
+
       async setUnit(unit, resetEquipment) {
         const cur = get().profile;
         const settings = resetEquipment ? { ...cur.settings, equipment: defaultEquipment(unit) } : cur.settings;
@@ -250,7 +284,7 @@ export function createAppStore(repo: Repo, clock: () => number = Date.now): AppS
         if (existing) return existing.id;
         const now = clock();
         const block = activeBlock(get().program, now);
-        let name = o.name ?? 'Workout';
+        let name = o.name ?? t('Workout');
         let items: (TemplateItem | { exerciseId: ID; item: null })[] = [];
         if (o.templateId) {
           const t = get().templates.find((x) => x.id === o.templateId);
@@ -427,7 +461,7 @@ export function createAppStore(repo: Repo, clock: () => number = Date.now): AppS
 
       async createProgram() {
         const now = clock();
-        const program: Program = { id: 'program', name: 'Hypertrophy → Strength', active: true, blocks: defaultBlocks(), currentBlockIndex: 0, blockStartedAt: now, createdAt: now, updatedAt: now };
+        const program: Program = { id: 'program', name: t('Hypertrophy → Strength'), active: true, blocks: defaultBlocks(), currentBlockIndex: 0, blockStartedAt: now, createdAt: now, updatedAt: now };
         set({ program });
         await repo.put('meta', program);
       },
@@ -478,11 +512,11 @@ export function createAppStore(repo: Repo, clock: () => number = Date.now): AppS
 
       async importData(json) {
         let d: { app?: string; version?: number; profile?: Profile; exercises?: Exercise[]; templates?: WorkoutTemplate[]; workouts?: Workout[]; program?: Program | null };
-        try { d = JSON.parse(json); } catch { throw new Error('That file is not valid JSON.'); }
+        try { d = JSON.parse(json); } catch { throw new Error(t('That file is not valid JSON.')); }
         if (d.app !== 'ironlog' || !Array.isArray(d.workouts) || !Array.isArray(d.exercises) || !d.profile) {
-          throw new Error('That file is not an IronLog backup.');
+          throw new Error(t('That file is not an IronLog backup.'));
         }
-        if ((d.version ?? 0) > BACKUP_VERSION) throw new Error('Backup is from a newer app version.');
+        if ((d.version ?? 0) > BACKUP_VERSION) throw new Error(t('Backup is from a newer app version.'));
         await repo.clearAll();
         await repo.put('meta', d.profile);
         if (d.program) await repo.put('meta', d.program);

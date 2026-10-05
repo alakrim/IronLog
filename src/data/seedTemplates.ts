@@ -1,10 +1,11 @@
 import type { Exercise, TemplateItem, WorkoutTemplate } from '../domain/types';
+import { t } from '../i18n';
 import { uid } from './uid';
 
-const PRESETS: [string, string[]][] = [
-  ['Push', ['bench_press', 'incline_db_press', 'lateral_raise', 'db_shoulder_press', 'triceps_pushdown']],
-  ['Pull', ['pull_up', 'barbell_row', 'lat_pulldown', 'rear_delt_fly', 'db_curl']],
-  ['Legs', ['squat', 'rdl', 'leg_press', 'leg_curl', 'calf_raise']],
+const PRESETS: [() => string, string[]][] = [
+  [() => t('Push'), ['bench_press', 'incline_db_press', 'lateral_raise', 'db_shoulder_press', 'triceps_pushdown']],
+  [() => t('Pull'), ['pull_up', 'barbell_row', 'lat_pulldown', 'rear_delt_fly', 'db_curl']],
+  [() => t('Legs'), ['squat', 'rdl', 'leg_press', 'leg_curl', 'calf_raise']],
 ];
 
 export function itemFor(ex: Exercise): TemplateItem {
@@ -15,7 +16,7 @@ export function seedTemplates(exercises: Exercise[], now: number): WorkoutTempla
   const byId = new Map(exercises.map((e) => [e.id, e]));
   return PRESETS.map(([name, ids], i) => ({
     id: uid('tpl'),
-    name,
+    name: name(),
     items: ids.map((id) => byId.get(id)).filter((e): e is Exercise => !!e).map(itemFor),
     createdAt: now + i,
     updatedAt: now + i,
