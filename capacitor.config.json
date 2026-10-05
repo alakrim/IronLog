@@ -1,0 +1,6 @@
+{
+  "appId": "app.ironlog.gym",
+  "appName": "IronLog",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#14191E" }
+}
